@@ -1,0 +1,1718 @@
+From: Youhei SASAKI <uwabami@gfd-dennou.org>
+Date: Tue, 5 Sep 2017 13:40:51 +0900
+Subject: Import upstream rspec files
+
+Signed-off-by: Youhei SASAKI <uwabami@gfd-dennou.org>
+---
+ spec/fixtures/bar.txt                |   1 +
+ spec/fixtures/config.ru              |   3 +
+ spec/fixtures/fake_app.rb            | 154 ++++++++++
+ spec/fixtures/foo.txt                |   1 +
+ spec/rack/test/cookie_jar_spec.rb    |  21 ++
+ spec/rack/test/cookie_object_spec.rb |  66 ++++
+ spec/rack/test/cookie_spec.rb        | 233 ++++++++++++++
+ spec/rack/test/digest_auth_spec.rb   |  46 +++
+ spec/rack/test/multipart_spec.rb     | 145 +++++++++
+ spec/rack/test/uploaded_file_spec.rb |  60 ++++
+ spec/rack/test/utils_spec.rb         | 198 ++++++++++++
+ spec/rack/test_spec.rb               | 576 +++++++++++++++++++++++++++++++++++
+ spec/spec_helper.rb                  |  66 ++++
+ spec/support/matchers/body.rb        |   9 +
+ spec/support/matchers/challenge.rb   |  11 +
+ 15 files changed, 1590 insertions(+)
+ create mode 100644 spec/fixtures/bar.txt
+ create mode 100644 spec/fixtures/config.ru
+ create mode 100644 spec/fixtures/fake_app.rb
+ create mode 100644 spec/fixtures/foo.txt
+ create mode 100644 spec/rack/test/cookie_jar_spec.rb
+ create mode 100644 spec/rack/test/cookie_object_spec.rb
+ create mode 100644 spec/rack/test/cookie_spec.rb
+ create mode 100644 spec/rack/test/digest_auth_spec.rb
+ create mode 100644 spec/rack/test/multipart_spec.rb
+ create mode 100644 spec/rack/test/uploaded_file_spec.rb
+ create mode 100644 spec/rack/test/utils_spec.rb
+ create mode 100644 spec/rack/test_spec.rb
+ create mode 100644 spec/spec_helper.rb
+ create mode 100644 spec/support/matchers/body.rb
+ create mode 100644 spec/support/matchers/challenge.rb
+
+diff --git a/spec/fixtures/bar.txt b/spec/fixtures/bar.txt
+new file mode 100644
+index 0000000..7601807
+--- /dev/null
++++ b/spec/fixtures/bar.txt
+@@ -0,0 +1 @@
++baz
+diff --git a/spec/fixtures/config.ru b/spec/fixtures/config.ru
+new file mode 100644
+index 0000000..407c9b9
+--- /dev/null
++++ b/spec/fixtures/config.ru
+@@ -0,0 +1,3 @@
++require "fake_app"
++
++run Rack::Test::FakeApp
+diff --git a/spec/fixtures/fake_app.rb b/spec/fixtures/fake_app.rb
+new file mode 100644
+index 0000000..b21a47c
+--- /dev/null
++++ b/spec/fixtures/fake_app.rb
+@@ -0,0 +1,154 @@
++require "rubygems"
++require "sinatra/base"
++
++module Rack
++  module Test
++
++    class FakeApp < Sinatra::Base
++      head "/" do
++        "meh"
++      end
++
++      options "/" do
++        [200, {}, ""]
++      end
++
++      get "/" do
++        "Hello, GET: #{params.inspect}"
++      end
++
++      get "/redirect" do
++        redirect "/redirected"
++      end
++
++      post "/redirect" do
++        if params["status"]
++          redirect to("/redirected"), Integer(params["status"])
++        else
++          redirect "/redirected"
++        end
++      end
++
++      [:get, :put, :post, :delete].each do |meth|
++        send(meth, "/redirected") do
++          additional_info = (meth == :get) ? "" : " using #{meth} with #{params}"
++          "You've been redirected" + additional_info
++        end
++      end
++
++      get "/void" do
++        [200, {}, ""]
++      end
++
++      get "/cookies/show" do
++        request.cookies.inspect
++      end
++
++      get "/COOKIES/show" do
++        request.cookies.inspect
++      end
++
++      get "/not-cookies/show" do
++        request.cookies.inspect
++      end
++
++      get "/cookies/set-secure" do
++        raise if params["value"].nil?
++
++        response.set_cookie("secure-cookie", :value => params["value"], :secure => true)
++        "Set"
++      end
++
++      get "/cookies/set-simple" do
++        raise if params["value"].nil?
++
++        response.set_cookie "simple", params["value"]
++        "Set"
++      end
++
++      post "/cookies/default-path" do
++        raise if params["value"].nil?
++
++        response.set_cookie "simple", params["value"]
++        "Set"
++      end
++
++      get "/cookies/default-path" do
++        response.cookies.inspect
++      end
++
++      get "/cookies/delete" do
++        response.delete_cookie "value"
++      end
++
++      get "/cookies/count" do
++        old_value = request.cookies["count"].to_i || 0
++        new_value = (old_value + 1).to_s
++
++        response.set_cookie("count", :value => new_value)
++        new_value
++      end
++
++      get "/cookies/set" do
++        raise if params["value"].nil?
++
++        response.set_cookie("value", {
++          :value => params["value"],
++          :path => "/cookies",
++          :expires => Time.now + 10
++        })
++        "Set"
++      end
++
++      get "/cookies/domain" do
++        old_value = request.cookies["count"].to_i || 0
++        new_value = (old_value + 1).to_s
++
++        response.set_cookie("count", :value => new_value, :domain => "localhost.com")
++        new_value
++      end
++
++      get "/cookies/subdomain" do
++        old_value = request.cookies["count"].to_i || 0
++        new_value = (old_value + 1).to_s
++
++        response.set_cookie("count", :value => new_value, :domain => ".example.org")
++        new_value
++      end
++
++      get "/cookies/set-uppercase" do
++        raise if params["value"].nil?
++
++        response.set_cookie("VALUE", {
++          :value => params["value"],
++          :path => "/cookies",
++          :expires => Time.now + 10
++        })
++        "Set"
++      end
++
++      get "/cookies/set-multiple" do
++        response.set_cookie("key1", :value => "value1")
++        response.set_cookie("key2", :value => "value2")
++        "Set"
++      end
++
++      post "/" do
++        "Hello, POST: #{params.inspect}"
++      end
++
++      put "/" do
++        "Hello, PUT: #{params.inspect}"
++      end
++
++      patch "/" do
++        "Hello, PUT: #{params.inspect}"
++      end
++
++      delete "/" do
++        "Hello, DELETE: #{params.inspect}"
++      end
++    end
++
++  end
++end
+diff --git a/spec/fixtures/foo.txt b/spec/fixtures/foo.txt
+new file mode 100644
+index 0000000..5716ca5
+--- /dev/null
++++ b/spec/fixtures/foo.txt
+@@ -0,0 +1 @@
++bar
+diff --git a/spec/rack/test/cookie_jar_spec.rb b/spec/rack/test/cookie_jar_spec.rb
+new file mode 100644
+index 0000000..90efd2a
+--- /dev/null
++++ b/spec/rack/test/cookie_jar_spec.rb
+@@ -0,0 +1,21 @@
++require "spec_helper"
++
++describe Rack::Test::CookieJar do
++  subject(:jar) { Rack::Test::CookieJar.new }
++
++  describe "#get_cookie" do
++    context "with a populated jar" do
++      let(:cookie_value) { "foo;abc" }
++      let(:cookie_name) { "a_cookie_name" }
++
++      before do
++        jar[cookie_name] = cookie_value
++      end
++
++      it "returns full cookie objects" do
++        cookie = jar.get_cookie(cookie_name)
++        expect(cookie).to be_a(Rack::Test::Cookie)
++      end
++    end
++  end
++end
+diff --git a/spec/rack/test/cookie_object_spec.rb b/spec/rack/test/cookie_object_spec.rb
+new file mode 100644
+index 0000000..f08b827
+--- /dev/null
++++ b/spec/rack/test/cookie_object_spec.rb
+@@ -0,0 +1,66 @@
++require "spec_helper"
++
++describe Rack::Test::Cookie do
++  subject(:cookie) { Rack::Test::Cookie.new(cookie_string) }
++
++  let(:cookie_string) { raw_cookie_string }
++
++  let(:raw_cookie_string) {
++    [
++      "cookie_name=" + CGI.escape(value),
++      "domain=" + domain,
++      "path=" + path,
++      "expires=" + expires,
++    ].join("; ")
++  }
++
++  let(:http_only_raw_cookie_string) {
++    raw_cookie_string + "; HttpOnly"
++  }
++
++  let(:http_only_secure_raw_cookie_string) {
++    http_only_raw_cookie_string + "; secure"
++  }
++
++  let(:value) { "the cookie value" }
++  let(:domain) { "www.example.org" }
++  let(:path) { "/" }
++  let(:expires) { "Mon, 10 Aug 2015 14:40:57 0100" }
++
++  describe "#to_h" do
++    let(:cookie_string) { http_only_secure_raw_cookie_string }
++
++    it "returns the cookie value and all options" do
++      expect(cookie.to_h).to eq(
++                               "value" => value,
++                               "domain" => domain,
++                               "path" => path,
++                               "expires" => expires,
++                               "HttpOnly" => true,
++                               "secure" => true,
++                             )
++    end
++  end
++
++  describe "#to_hash" do
++    it "is an alias for #to_h" do
++      expect(cookie.to_hash).to eq(cookie.to_h)
++    end
++  end
++
++  describe "#http_only?" do
++    context "for a non HTTP only cookie" do
++      it "returns false" do
++        expect(cookie.http_only?).to be(false)
++      end
++    end
++
++    context "for a HTTP only cookie" do
++      let(:cookie_string) { http_only_raw_cookie_string }
++
++      it "returns true" do
++        expect(cookie.http_only?).to be(true)
++      end
++    end
++  end
++end
+diff --git a/spec/rack/test/cookie_spec.rb b/spec/rack/test/cookie_spec.rb
+new file mode 100644
+index 0000000..0b8a623
+--- /dev/null
++++ b/spec/rack/test/cookie_spec.rb
+@@ -0,0 +1,233 @@
++require "spec_helper"
++
++describe Rack::Test::Session do
++
++  context "cookies" do
++    it "keeps a cookie jar" do
++      get "/cookies/show"
++      check expect(last_request.cookies).to eq({})
++
++      get "/cookies/set", "value" => "1"
++      get "/cookies/show"
++      expect(last_request.cookies).to eq({ "value" => "1" })
++    end
++
++    it "doesn't send expired cookies" do
++      get "/cookies/set", "value" => "1"
++      now = Time.now
++      allow(Time).to receive_messages(:now => now + 60)
++      get "/cookies/show"
++      expect(last_request.cookies).to eq({})
++    end
++
++    it "cookie path defaults to the uri of the document that was requested" do
++      skip "See issue rack-test github issue #50"
++      post "/cookies/default-path", "value" => "cookie"
++      get "/cookies/default-path"
++      expect(last_request.cookies).to eq({ "simple"=>"cookie" })
++      get "/cookies/show"
++      expect(last_request.cookies).to eq({})
++    end
++
++    it "escapes cookie values" do
++      jar = Rack::Test::CookieJar.new
++      jar["value"] = "foo;abc"
++      expect(jar["value"]).to eq("foo;abc")
++    end
++
++    it "deletes cookies directly from the CookieJar" do
++      jar = Rack::Test::CookieJar.new
++      jar["abcd"] = "1234"
++      expect(jar["abcd"]).to eq("1234")
++      jar.delete("abcd")
++      expect(jar["abcd"]).to eq(nil)
++    end
++
++    it "allow symbol access" do
++      jar = Rack::Test::CookieJar.new
++      jar["value"] = "foo;abc"
++      jar[:value].should == "foo;abc"
++    end
++
++    it "doesn't send cookies with the wrong domain" do
++      get "http://www.example.com/cookies/set", "value" => "1"
++      get "http://www.other.example/cookies/show"
++      expect(last_request.cookies).to eq({})
++    end
++
++    it "doesn't send cookies with the wrong path" do
++      get "/cookies/set", "value" => "1"
++      get "/not-cookies/show"
++      expect(last_request.cookies).to eq({})
++    end
++
++    it "persists cookies across requests that don't return any cookie headers" do
++      get "/cookies/set", "value" => "1"
++      get "/void"
++      get "/cookies/show"
++      expect(last_request.cookies).to eq({ "value" => "1" })
++    end
++
++    it "deletes cookies" do
++      get "/cookies/set", "value" => "1"
++      get "/cookies/delete"
++      get "/cookies/show"
++      expect(last_request.cookies).to eq({ })
++    end
++
++    it "respects cookie domains when no domain is explicitly set" do
++      skip "FIXME: www.example.org should not get the first cookie"
++      expect(request("http://example.org/cookies/count")).to     have_body("1")
++      expect(request("http://www.example.org/cookies/count")).to have_body("1")
++      expect(request("http://example.org/cookies/count")).to     have_body("2")
++      expect(request("http://www.example.org/cookies/count")).to have_body("2")
++    end
++
++    it "treats domains case insensitively" do
++      get "http://example.com/cookies/set", "value" => "1"
++      get "http://EXAMPLE.COM/cookies/show"
++      expect(last_request.cookies).to eq({ "value" => "1" })
++    end
++
++    it "treats paths case sensitively" do
++      get "/cookies/set", "value" => "1"
++      get "/COOKIES/show"
++      expect(last_request.cookies).to eq({})
++    end
++
++    it "prefers more specific cookies" do
++      get "http://example.com/cookies/set",     "value" => "domain"
++      get "http://sub.example.com/cookies/set", "value" => "sub"
++
++      get "http://sub.example.com/cookies/show"
++      check expect(last_request.cookies).to eq({ "value" => "sub" })
++
++      get "http://example.com/cookies/show"
++      expect(last_request.cookies).to eq({ "value" => "domain" })
++    end
++
++    it "treats cookie names case insensitively" do
++      get "/cookies/set", "value" => "lowercase"
++      get "/cookies/set-uppercase", "value" => "UPPERCASE"
++      get "/cookies/show"
++      expect(last_request.cookies).to eq({ "VALUE" => "UPPERCASE" })
++    end
++
++    it "defaults the domain to the request domain" do
++      get "http://example.com/cookies/set-simple", "value" => "cookie"
++      get "http://example.com/cookies/show"
++      check expect(last_request.cookies).to eq({ "simple" => "cookie" })
++
++      get "http://other.example/cookies/show"
++      expect(last_request.cookies).to eq({})
++    end
++
++    it "defaults the domain to the request path up to the last slash" do
++      get "/cookies/set-simple", "value" => "1"
++      get "/not-cookies/show"
++      expect(last_request.cookies).to eq({})
++    end
++
++    it "supports secure cookies" do
++      get "https://example.com/cookies/set-secure", "value" => "set"
++      get "http://example.com/cookies/show"
++      check expect(last_request.cookies).to eq({})
++
++      get "https://example.com/cookies/show"
++      expect(last_request.cookies).to eq({ "secure-cookie" => "set" })
++      expect(rack_mock_session.cookie_jar['secure-cookie']).to eq('set')
++    end
++
++    it "supports secure cookies when enabling SSL via env" do
++      get "//example.com/cookies/set-secure", { "value" => "set" }, "HTTPS" => "on"
++      get "//example.com/cookies/show", nil, "HTTPS" => "off"
++      check expect(last_request.cookies).to eq({})
++
++      get "//example.com/cookies/show", nil, "HTTPS" => "on"
++      expect(last_request.cookies).to eq({ "secure-cookie" => "set" })
++      expect(rack_mock_session.cookie_jar['secure-cookie']).to eq('set')
++    end
++
++    it "keeps separate cookie jars for different domains" do
++      get "http://example.com/cookies/set", "value" => "example"
++      get "http://example.com/cookies/show"
++      check expect(last_request.cookies).to eq({ "value" => "example" })
++
++      get "http://other.example/cookies/set", "value" => "other"
++      get "http://other.example/cookies/show"
++      check expect(last_request.cookies).to eq({ "value" => "other" })
++
++      get "http://example.com/cookies/show"
++      expect(last_request.cookies).to eq({ "value" => "example" })
++    end
++
++    it "keeps one cookie jar for domain and its subdomains" do
++      get "http://example.org/cookies/subdomain"
++      get "http://example.org/cookies/subdomain"
++      expect(last_request.cookies).to eq({ "count" => "1" })
++
++      get "http://foo.example.org/cookies/subdomain"
++      expect(last_request.cookies).to eq({ "count" => "2" })
++    end
++
++    it "allows cookies to be cleared" do
++      get "/cookies/set", "value" => "1"
++      clear_cookies
++      get "/cookies/show"
++      expect(last_request.cookies).to eq({})
++    end
++
++    it "allow cookies to be set" do
++      set_cookie "value=10"
++      get "/cookies/show"
++      expect(last_request.cookies).to eq({ "value" => "10" })
++    end
++
++    it "allows an array of cookies to be set" do
++      set_cookie ["value=10", "foo=bar"]
++      get "/cookies/show"
++      expect(last_request.cookies).to eq({ "value" => "10", "foo" => "bar" })
++    end
++
++    it "skips emtpy string cookies" do
++      set_cookie "value=10\n\nfoo=bar"
++      get "/cookies/show"
++      expect(last_request.cookies).to eq({ "value" => "10", "foo" => "bar" })
++    end
++
++    it "parses multiple cookies properly" do
++      get "/cookies/set-multiple"
++      get "/cookies/show"
++      expect(last_request.cookies).to eq({ "key1" => "value1", "key2" => "value2" })
++    end
++
++    it "supports multiple sessions" do
++      with_session(:first) do
++        get "/cookies/set", "value" => "1"
++        get "/cookies/show"
++        expect(last_request.cookies).to eq({ "value" => "1" })
++      end
++
++      with_session(:second) do
++        get "/cookies/show"
++        expect(last_request.cookies).to eq({ })
++      end
++    end
++
++    it "uses :default as the default session name" do
++      get "/cookies/set", "value" => "1"
++      get "/cookies/show"
++      check expect(last_request.cookies).to eq({ "value" => "1" })
++
++      with_session(:default) do
++        get "/cookies/show"
++        expect(last_request.cookies).to eq({ "value" => "1" })
++      end
++    end
++
++    it "accepts explicitly provided cookies" do
++      request "/cookies/show", :cookie => "value=1"
++      expect(last_request.cookies).to eq({ "value" => "1" })
++    end
++  end
++end
+diff --git a/spec/rack/test/digest_auth_spec.rb b/spec/rack/test/digest_auth_spec.rb
+new file mode 100644
+index 0000000..cccf1d6
+--- /dev/null
++++ b/spec/rack/test/digest_auth_spec.rb
+@@ -0,0 +1,46 @@
++require "spec_helper"
++
++describe Rack::Test::Session do
++  context "HTTP Digest authentication" do
++
++    def app
++      app = Rack::Auth::Digest::MD5.new(Rack::Test::FakeApp.new) do |username|
++        { 'alice' => 'correct-password' }[username]
++      end
++      app.realm = 'WallysWorld'
++      app.opaque = 'this-should-be-secret'
++      app
++    end
++
++    it 'incorrectly authenticates GETs' do
++      digest_authorize 'foo', 'bar'
++      get '/'
++      expect(last_response).to be_challenge
++    end
++
++    it "correctly authenticates GETs" do
++      digest_authorize "alice", "correct-password"
++      response = get "/"
++      expect(response).to be_ok
++    end
++
++    it "correctly authenticates GETs with params" do
++      digest_authorize "alice", "correct-password"
++      response = get "/", "foo" => "bar"
++      expect(response).to be_ok
++    end
++
++    it "correctly authenticates POSTs" do
++      digest_authorize "alice", "correct-password"
++      response = post "/"
++      expect(response).to be_ok
++    end
++
++    it "returns a re-challenge if authenticating incorrectly" do
++      digest_authorize "alice", "incorrect-password"
++      response = get "/"
++      expect(response).to be_challenge
++    end
++
++  end
++end
+diff --git a/spec/rack/test/multipart_spec.rb b/spec/rack/test/multipart_spec.rb
+new file mode 100644
+index 0000000..2e7bf16
+--- /dev/null
++++ b/spec/rack/test/multipart_spec.rb
+@@ -0,0 +1,145 @@
++# encoding: UTF-8
++
++require "spec_helper"
++
++describe Rack::Test::Session do
++
++  def test_file_path
++    File.dirname(__FILE__) + "/../../fixtures/foo.txt"
++  end
++
++  def second_test_file_path
++    File.dirname(__FILE__) + "/../../fixtures/bar.txt"
++  end
++
++  def uploaded_file
++    Rack::Test::UploadedFile.new(test_file_path)
++  end
++
++  def second_uploaded_file
++    Rack::Test::UploadedFile.new(second_test_file_path)
++  end
++
++  context "uploading a file" do
++    it "sends the multipart/form-data content type" do
++      post "/", "photo" => uploaded_file
++      expect(last_request.env["CONTENT_TYPE"]).to include("multipart/form-data;")
++    end
++
++    it "sends regular params" do
++      post "/", "photo" => uploaded_file, "foo" => "bar"
++      expect(last_request.POST["foo"]).to eq("bar")
++    end
++
++    it "sends nested params" do
++      post "/", "photo" => uploaded_file, "foo" => {"bar" => "baz"}
++      expect(last_request.POST["foo"]["bar"]).to eq("baz")
++    end
++
++    it "sends multiple nested params" do
++      post "/", "photo" => uploaded_file, "foo" => {"bar" => {"baz" => "bop"}}
++      expect(last_request.POST["foo"]["bar"]["baz"]).to eq("bop")
++    end
++
++    it "sends params with arrays" do
++      post "/", "photo" => uploaded_file, "foo" => ["1", "2"]
++      expect(last_request.POST["foo"]).to eq(["1", "2"])
++    end
++
++    it "sends params with encoding sensitive values" do
++      post "/", "photo" => uploaded_file, "foo" => "bar? baz"
++      expect(last_request.POST["foo"]).to eq("bar? baz")
++    end
++
++    it "sends params encoded as ISO-8859-1" do
++      post "/", "photo" => uploaded_file, "foo" => "bar", "utf8" => "☃"
++      expect(last_request.POST["foo"]).to eq("bar")
++
++      if Rack::Test.encoding_aware_strings?
++        expect(last_request.POST["utf8"]).to eq("☃")
++      else
++        expect(last_request.POST["utf8"]).to eq("\xE2\x98\x83")
++      end
++    end
++
++    it "sends params with parens in names" do
++      post "/", "photo" => uploaded_file, "foo(1i)" => "bar"
++      expect(last_request.POST["foo(1i)"]).to eq("bar")
++    end
++
++    it "sends params with encoding sensitive names" do
++      post "/", "photo" => uploaded_file, "foo bar" => "baz"
++      expect(last_request.POST["foo bar"]).to eq("baz")
++    end
++
++    it "sends files with the filename" do
++      post "/", "photo" => uploaded_file
++      expect(last_request.POST["photo"][:filename]).to eq("foo.txt")
++    end
++
++    it "sends files with the text/plain MIME type by default" do
++      post "/", "photo" => uploaded_file
++      expect(last_request.POST["photo"][:type]).to eq("text/plain")
++    end
++
++    it "sends files with the right name" do
++      post "/", "photo" => uploaded_file
++      expect(last_request.POST["photo"][:name]).to eq("photo")
++    end
++
++    it "allows overriding the content type" do
++      post "/", "photo" => Rack::Test::UploadedFile.new(test_file_path, "image/jpeg")
++      expect(last_request.POST["photo"][:type]).to eq("image/jpeg")
++    end
++
++    it "sends files with a Content-Length in the header" do
++      post "/", "photo" => uploaded_file
++      expect(last_request.POST["photo"][:head]).to include("Content-Length: 4")
++    end
++
++    it "sends files as Tempfiles" do
++      post "/", "photo" => uploaded_file
++      expect(last_request.POST["photo"][:tempfile]).to be_a(::Tempfile)
++    end
++  end
++
++
++  context "uploading two files" do
++    it "sends the multipart/form-data content type" do
++      post "/", "photos" => [uploaded_file, second_uploaded_file]
++      expect(last_request.env["CONTENT_TYPE"]).to include("multipart/form-data;")
++    end
++
++    it "sends files with the filename" do
++      post "/", "photos" => [uploaded_file, second_uploaded_file]
++      expect(last_request.POST["photos"].collect{|photo| photo[:filename]}).to eq(["foo.txt", "bar.txt"])
++    end
++
++    it "sends files with the text/plain MIME type by default" do
++      post "/", "photos" => [uploaded_file, second_uploaded_file]
++      expect(last_request.POST["photos"].collect{|photo| photo[:type]}).to eq(["text/plain", "text/plain"])
++    end
++
++    it "sends files with the right names" do
++      post "/", "photos" => [uploaded_file, second_uploaded_file]
++      last_request.POST["photos"].all?{|photo| expect(photo[:name]).to eq("photos[]") }
++    end
++
++    it "allows mixed content types" do
++      image_file = Rack::Test::UploadedFile.new(test_file_path, "image/jpeg")
++
++      post "/", "photos" => [uploaded_file, image_file]
++      expect(last_request.POST["photos"].collect{|photo| photo[:type]}).to eq(["text/plain", "image/jpeg"])
++    end
++
++    it "sends files with a Content-Length in the header" do
++      post "/", "photos" => [uploaded_file, second_uploaded_file]
++      last_request.POST["photos"].all?{|photo| expect(photo[:head]).to include("Content-Length: 4") }
++    end
++
++    it "sends both files as Tempfiles" do
++      post "/", "photos" => [uploaded_file, second_uploaded_file]
++      last_request.POST["photos"].all?{|photo| expect(photo[:tempfile]).to be_a(::Tempfile) }
++    end
++  end
++end
+diff --git a/spec/rack/test/uploaded_file_spec.rb b/spec/rack/test/uploaded_file_spec.rb
+new file mode 100644
+index 0000000..634d491
+--- /dev/null
++++ b/spec/rack/test/uploaded_file_spec.rb
+@@ -0,0 +1,60 @@
++require "spec_helper"
++
++describe Rack::Test::UploadedFile do
++  def test_file_path
++    File.dirname(__FILE__) + "/../../fixtures/foo.txt"
++  end
++
++  it "returns an instance of `Rack::Test::UploadedFile`" do
++    uploaded_file = Rack::Test::UploadedFile.new(test_file_path)
++
++    expect(uploaded_file).to be_a(Rack::Test::UploadedFile)
++  end
++
++  it "responds to things that Tempfile responds to" do
++    uploaded_file = Rack::Test::UploadedFile.new(test_file_path)
++
++    expect(uploaded_file).to respond_to(:close)
++    expect(uploaded_file).to respond_to(:close!)
++    expect(uploaded_file).to respond_to(:delete)
++    expect(uploaded_file).to respond_to(:length)
++    expect(uploaded_file).to respond_to(:open)
++    expect(uploaded_file).to respond_to(:path)
++    expect(uploaded_file).to respond_to(:size)
++    expect(uploaded_file).to respond_to(:unlink)
++    expect(uploaded_file).to respond_to(:read)
++    expect(uploaded_file).to respond_to(:original_filename)
++    expect(uploaded_file).to respond_to(:tempfile) # Allows calls to params[:file].tempfile
++  end
++
++  it "creates Tempfiles with original file's extension" do
++    uploaded_file = Rack::Test::UploadedFile.new(test_file_path)
++
++    expect(File.extname(uploaded_file.path)).to eq(".txt")
++  end
++
++  context "it should call its destructor" do
++    it "calls the destructor" do
++      expect(Rack::Test::UploadedFile).to receive(:actually_finalize).at_least(:once)
++
++      if RUBY_PLATFORM == 'java'
++        require 'java'
++        java_import 'java.lang.System'
++
++        50.times do |i|
++          uploaded_file = Rack::Test::UploadedFile.new(test_file_path)
++
++          uploaded_file = nil
++
++          System.gc()
++        end
++      else
++        uploaded_file = Rack::Test::UploadedFile.new(test_file_path)
++
++        uploaded_file = nil
++
++        GC.start
++      end
++    end
++  end
++end
+diff --git a/spec/rack/test/utils_spec.rb b/spec/rack/test/utils_spec.rb
+new file mode 100644
+index 0000000..d94a249
+--- /dev/null
++++ b/spec/rack/test/utils_spec.rb
+@@ -0,0 +1,198 @@
++require "spec_helper"
++
++describe Rack::Test::Utils do
++  include Rack::Test::Utils
++
++  describe "build_nested_query" do
++    it "converts empty strings to =" do
++      expect(build_nested_query("")).to eq("=")
++    end
++
++    it "converts nil to an empty string" do
++      expect(build_nested_query(nil)).to eq("")
++    end
++
++    it "converts hashes with nil values" do
++      expect(build_nested_query(:a => nil)).to eq("a")
++    end
++
++    it "converts hashes" do
++      expect(build_nested_query(:a => 1)).to eq("a=1")
++    end
++
++    it "converts hashes with multiple keys" do
++      hash = { :a => 1, :b => 2 }
++      expect(["a=1&b=2", "b=2&a=1"]).to include(build_nested_query(hash))
++    end
++
++    it "converts arrays with one element" do
++      expect(build_nested_query(:a => [1])).to eq("a[]=1")
++    end
++
++    it "converts arrays with multiple elements" do
++      expect(build_nested_query(:a => [1, 2])).to eq("a[]=1&a[]=2")
++    end
++
++    it "converts arrays with brackets '[]' in the name" do
++      expect(build_nested_query("a[]" => [1, 2])).to eq("a%5B%5D=1&a%5B%5D=2")
++    end
++
++    it "converts nested hashes" do
++      expect(build_nested_query(:a => { :b => 1 })).to eq("a[b]=1")
++    end
++
++    it "converts arrays nested in a hash" do
++      expect(build_nested_query(:a => { :b => [1, 2] })).to eq("a[b][]=1&a[b][]=2")
++    end
++
++    it "converts arrays of hashes" do
++      expect(build_nested_query(:a => [{ :b => 2}, { :c => 3}])).to eq("a[][b]=2&a[][c]=3")
++    end
++
++    it "supports hash keys with empty arrays" do
++      input = { collection: [] }
++      expect(build_nested_query(input)).to eq('collection[]=')
++    end
++  end
++
++  describe "Rack::Test::Utils.build_multipart" do
++    it "builds multipart bodies" do
++      files = Rack::Test::UploadedFile.new(multipart_file("foo.txt"))
++      data  = Rack::Test::Utils.build_multipart("submit-name" => "Larry", "files" => files)
++
++      options = {
++        "CONTENT_TYPE" => "multipart/form-data; boundary=#{Rack::Test::MULTIPART_BOUNDARY}",
++        "CONTENT_LENGTH" => data.length.to_s,
++        :input => StringIO.new(data)
++      }
++      env = Rack::MockRequest.env_for("/", options)
++      params = Rack::Multipart.parse_multipart(env)
++      check expect(params["submit-name"]).to eq("Larry")
++      check expect(params["files"][:filename]).to eq("foo.txt")
++      expect(params["files"][:tempfile].read).to eq("bar\n")
++    end
++
++   it "builds multipart bodies from array of files" do
++      files = [Rack::Test::UploadedFile.new(multipart_file("foo.txt")), Rack::Test::UploadedFile.new(multipart_file("bar.txt"))]
++      data  = Rack::Test::Utils.build_multipart("submit-name" => "Larry", "files" => files)
++
++      options = {
++        "CONTENT_TYPE" => "multipart/form-data; boundary=#{Rack::Test::MULTIPART_BOUNDARY}",
++        "CONTENT_LENGTH" => data.length.to_s,
++        :input => StringIO.new(data)
++      }
++      env = Rack::MockRequest.env_for("/", options)
++      params = Rack::Multipart.parse_multipart(env)
++      check expect(params["submit-name"]).to eq("Larry")
++
++      check expect(params["files"][0][:filename]).to eq("foo.txt")
++      expect(params["files"][0][:tempfile].read).to eq("bar\n")
++
++      check expect(params["files"][1][:filename]).to eq("bar.txt")
++      expect(params["files"][1][:tempfile].read).to eq("baz\n")
++    end
++
++    it "builds nested multipart bodies" do
++      files = Rack::Test::UploadedFile.new(multipart_file("foo.txt"))
++      data  = Rack::Test::Utils.build_multipart("people" => [{"submit-name" => "Larry", "files" => files}], "foo" => ['1', '2'])
++
++      options = {
++        "CONTENT_TYPE" => "multipart/form-data; boundary=#{Rack::Test::MULTIPART_BOUNDARY}",
++        "CONTENT_LENGTH" => data.length.to_s,
++        :input => StringIO.new(data)
++      }
++      env = Rack::MockRequest.env_for("/", options)
++      params = Rack::Multipart.parse_multipart(env)
++      check expect(params["people"][0]["submit-name"]).to eq("Larry")
++      check expect(params["people"][0]["files"][:filename]).to eq("foo.txt")
++      expect(params["people"][0]["files"][:tempfile].read).to eq("bar\n")
++      check expect(params["foo"]).to eq(["1", "2"])
++    end
++
++    it "builds nested multipart bodies with an array of hashes" do
++      files = Rack::Test::UploadedFile.new(multipart_file("foo.txt"))
++      data  = Rack::Test::Utils.build_multipart("files" => files, "foo" => [{"id" => "1", "name" => 'Dave'}, {"id" => "2", "name" => 'Steve'}])
++
++      options = {
++        "CONTENT_TYPE" => "multipart/form-data; boundary=#{Rack::Test::MULTIPART_BOUNDARY}",
++        "CONTENT_LENGTH" => data.length.to_s,
++        :input => StringIO.new(data)
++      }
++      env = Rack::MockRequest.env_for("/", options)
++      params = Rack::Multipart.parse_multipart(env)
++      check expect(params["files"][:filename]).to eq("foo.txt")
++      expect(params["files"][:tempfile].read).to eq("bar\n")
++      check expect(params["foo"]).to eq([{"id" => "1", "name" => "Dave"}, {"id" => "2", "name" => "Steve"}])
++    end
++
++    it "builds nested multipart bodies with arbitrarily nested array of hashes" do
++      files = Rack::Test::UploadedFile.new(multipart_file("foo.txt"))
++      data  = Rack::Test::Utils.build_multipart("files" => files, "foo" => {"bar" => [{"id" => "1", "name" => 'Dave'},
++                                                                    {"id" => "2", "name" => 'Steve', "qux" => [{"id" => '3', "name" => 'mike'},
++                                                                                                               {"id" => '4', "name" => 'Joan'}]}]})
++
++      options = {
++        "CONTENT_TYPE" => "multipart/form-data; boundary=#{Rack::Test::MULTIPART_BOUNDARY}",
++        "CONTENT_LENGTH" => data.length.to_s,
++        :input => StringIO.new(data)
++      }
++      env = Rack::MockRequest.env_for("/", options)
++      params = Rack::Multipart.parse_multipart(env)
++      check expect(params["files"][:filename]).to eq("foo.txt")
++      expect(params["files"][:tempfile].read).to eq("bar\n")
++      check expect(params["foo"]).to eq({"bar" => [{"id" => "1", "name" => "Dave"},
++                                               {"id" => "2", "name" => "Steve", "qux" => [{"id" => '3', "name" => 'mike'},
++                                                                                          {"id" => '4', "name" => 'Joan'}]}]})
++    end
++
++    it 'does not break with params that look nested, but are not' do
++      files = Rack::Test::UploadedFile.new(multipart_file("foo.txt"))
++      data  = Rack::Test::Utils.build_multipart("foo[]" => "1", "bar[]" => {"qux" => "2"}, "files[]" => files)
++
++      options = {
++        "CONTENT_TYPE" => "multipart/form-data; boundary=#{Rack::Test::MULTIPART_BOUNDARY}",
++        "CONTENT_LENGTH" => data.length.to_s,
++        :input => StringIO.new(data)
++      }
++      env = Rack::MockRequest.env_for("/", options)
++      params = Rack::Multipart.parse_multipart(env)
++      check expect(params["files"][0][:filename]).to eq("foo.txt")
++      expect(params["files"][0][:tempfile].read).to eq("bar\n")
++      check expect(params["foo"][0]).to eq("1")
++      check expect(params["bar"][0]).to eq({"qux" => "2"})
++    end
++
++    it 'allows for nested files' do
++      files = Rack::Test::UploadedFile.new(multipart_file("foo.txt"))
++      data  = Rack::Test::Utils.build_multipart("foo" => [{"id" => "1", "data" => files},
++                                        {"id" => "2", "data" => ["3", "4"]}])
++
++      options = {
++        "CONTENT_TYPE" => "multipart/form-data; boundary=#{Rack::Test::MULTIPART_BOUNDARY}",
++        "CONTENT_LENGTH" => data.length.to_s,
++        :input => StringIO.new(data)
++      }
++      env = Rack::MockRequest.env_for("/", options)
++      params = Rack::Multipart.parse_multipart(env)
++      check expect(params["foo"][0]["id"]).to eq("1")
++      check expect(params["foo"][0]["data"][:filename]).to eq("foo.txt")
++      expect(params["foo"][0]["data"][:tempfile].read).to eq("bar\n")
++      check expect(params["foo"][1]).to eq({"id" => "2", "data" => ["3", "4"]})
++    end
++
++    it "returns nil if no UploadedFiles were used" do
++      data = Rack::Test::Utils.build_multipart("people" => [{"submit-name" => "Larry", "files" => "contents"}])
++      expect(data).to be_nil
++    end
++
++    it "raises ArgumentErrors if params is not a Hash" do
++      expect {
++        Rack::Test::Utils.build_multipart("foo=bar")
++      }.to raise_error(ArgumentError, "value must be a Hash")
++    end
++
++    def multipart_file(name)
++      File.join(File.dirname(__FILE__), "..", "..", "fixtures", name.to_s)
++    end
++  end
++end
+diff --git a/spec/rack/test_spec.rb b/spec/rack/test_spec.rb
+new file mode 100644
+index 0000000..bb7f776
+--- /dev/null
++++ b/spec/rack/test_spec.rb
+@@ -0,0 +1,576 @@
++require "spec_helper"
++
++describe Rack::Test::Session do
++  describe "initialization" do
++    it "supports being initialized with a Rack::MockSession app" do
++      session = Rack::Test::Session.new(Rack::MockSession.new(app))
++      expect(session.request("/")).to be_ok
++    end
++
++    it "supports being initialized with an app" do
++      session = Rack::Test::Session.new(app)
++      expect(session.request("/")).to be_ok
++    end
++  end
++
++  describe "#request" do
++    it "requests the URI using GET by default" do
++      request "/"
++      expect(last_request).to be_get
++      expect(last_response).to be_ok
++    end
++
++    it "returns a response" do
++      expect(request("/")).to be_ok
++    end
++
++    it "uses the provided env" do
++      request "/", "X-Foo" => "bar"
++      expect(last_request.env["X-Foo"]).to eq("bar")
++    end
++
++    it "allows HTTP_HOST to be set" do
++      request "/", "HTTP_HOST" => "www.example.ua"
++      expect(last_request.env['HTTP_HOST']).to eq("www.example.ua")
++    end
++
++    it "sets HTTP_HOST with port for non-default ports" do
++      request "http://foo.com:8080"
++      expect(last_request.env["HTTP_HOST"]).to eq("foo.com:8080")
++      request "https://foo.com:8443"
++      expect(last_request.env["HTTP_HOST"]).to eq("foo.com:8443")
++    end
++
++    it "sets HTTP_HOST without port for default ports" do
++      request "http://foo.com"
++      expect(last_request.env["HTTP_HOST"]).to eq("foo.com")
++      request "http://foo.com:80"
++      expect(last_request.env["HTTP_HOST"]).to eq("foo.com")
++      request "https://foo.com:443"
++      expect(last_request.env["HTTP_HOST"]).to eq("foo.com")
++    end
++
++    it "defaults to GET" do
++      request "/"
++      expect(last_request.env["REQUEST_METHOD"]).to eq("GET")
++    end
++
++    it "defaults the REMOTE_ADDR to 127.0.0.1" do
++      request "/"
++      expect(last_request.env["REMOTE_ADDR"]).to eq("127.0.0.1")
++    end
++
++    it "sets rack.test to true in the env" do
++      request "/"
++      expect(last_request.env["rack.test"]).to eq(true)
++    end
++
++    it "defaults to port 80" do
++      request "/"
++      expect(last_request.env["SERVER_PORT"]).to eq("80")
++    end
++
++    it "defaults to example.org" do
++      request "/"
++      expect(last_request.env["SERVER_NAME"]).to eq("example.org")
++    end
++
++    it "yields the response to a given block" do
++      request "/" do |response|
++        expect(response).to be_ok
++      end
++    end
++
++    it "supports sending :params" do
++      request "/", :params => { "foo" => "bar" }
++      expect(last_request.GET["foo"]).to eq("bar")
++    end
++
++    it "doesn't follow redirects by default" do
++      request "/redirect"
++      expect(last_response).to be_redirect
++      expect(last_response.body).to be_empty
++    end
++
++    it "allows passing :input in for POSTs" do
++      request "/", :method => :post, :input => "foo"
++      expect(last_request.env["rack.input"].read).to eq("foo")
++    end
++
++    it "converts method names to a uppercase strings" do
++      request "/", :method => :put
++      expect(last_request.env["REQUEST_METHOD"]).to eq("PUT")
++    end
++
++    it "prepends a slash to the URI path" do
++      request "foo"
++      expect(last_request.env["PATH_INFO"]).to eq("/foo")
++    end
++
++    it "accepts params and builds query strings for GET requests" do
++      request "/foo?baz=2", :params => {:foo => {:bar => "1"}}
++      expect(last_request.GET).to eq({ "baz" => "2", "foo" => { "bar" => "1" }})
++    end
++
++    it "parses query strings with repeated variable names correctly" do
++      request "/foo?bar=2&bar=3"
++      expect(last_request.GET).to eq({ "bar" => "3" })
++    end
++
++    it "accepts raw input in params for GET requests" do
++      request "/foo?baz=2", :params => "foo[bar]=1"
++      expect(last_request.GET).to eq({ "baz" => "2", "foo" => { "bar" => "1" }})
++    end
++
++    it "does not rewrite a GET query string when :params is not supplied" do
++      request "/foo?a=1&b=2&c=3&e=4&d=5+%20"
++      expect(last_request.query_string).to eq("a=1&b=2&c=3&e=4&d=5+%20")
++    end
++
++    it "does not rewrite a GET query string when :params is empty" do
++      request "/foo?a=1&b=2&c=3&e=4&d=5", :params => {}
++      last_request.query_string.should == "a=1&b=2&c=3&e=4&d=5"
++    end
++
++    it "does not overwrite multiple query string keys" do
++      request "/foo?a=1&a=2", :params => { :bar => 1 }
++      expect(last_request.query_string).to eq("a=1&a=2&bar=1")
++    end
++
++    it "accepts params and builds url encoded params for POST requests" do
++      request "/foo", :method => :post, :params => {:foo => {:bar => "1"}}
++      expect(last_request.env["rack.input"].read).to eq("foo[bar]=1")
++    end
++
++    it "accepts raw input in params for POST requests" do
++      request "/foo", :method => :post, :params => "foo[bar]=1"
++      expect(last_request.env["rack.input"].read).to eq("foo[bar]=1")
++    end
++
++    context "when the response body responds_to?(:close)" do
++      class CloseableBody
++        def initialize
++          @closed = false
++        end
++
++        def each
++          return if @closed
++          yield "Hello, World!"
++        end
++
++        def close
++          @closed = true
++        end
++      end
++
++      it "closes response's body" do
++        body = CloseableBody.new
++        expect(body).to receive(:close)
++
++        app = lambda do |env|
++          [200, {"Content-Type" => "text/html", "Content-Length" => "13"}, body]
++        end
++
++        session = Rack::Test::Session.new(Rack::MockSession.new(app))
++        session.request("/")
++      end
++
++      it "closes response's body after iteration" do
++        app = lambda do |env|
++          [200, {"Content-Type" => "text/html", "Content-Length" => "13"}, CloseableBody.new]
++        end
++
++        session = Rack::Test::Session.new(Rack::MockSession.new(app))
++        session.request("/")
++        expect(session.last_response.body).to eq("Hello, World!")
++      end
++    end
++
++    context "when input is given" do
++      it "sends the input" do
++        request "/", :method => "POST", :input => "foo"
++        expect(last_request.env["rack.input"].read).to eq("foo")
++      end
++
++      it "does not send a multipart request" do
++        request "/", :method => "POST", :input => "foo"
++        expect(last_request.env["CONTENT_TYPE"]).not_to eq("application/x-www-form-urlencoded")
++      end
++    end
++
++    context "for a POST specified with :method" do
++      it "uses application/x-www-form-urlencoded as the CONTENT_TYPE" do
++        request "/", :method => "POST"
++        expect(last_request.env["CONTENT_TYPE"]).to eq("application/x-www-form-urlencoded")
++      end
++    end
++
++    context "for a POST specified with REQUEST_METHOD" do
++      it "uses application/x-www-form-urlencoded as the CONTENT_TYPE" do
++        request "/", "REQUEST_METHOD" => "POST"
++        expect(last_request.env["CONTENT_TYPE"]).to eq("application/x-www-form-urlencoded")
++      end
++    end
++
++    context "when CONTENT_TYPE is specified in the env" do
++      it "does not overwrite the CONTENT_TYPE" do
++        request "/", "CONTENT_TYPE" => "application/xml"
++        expect(last_request.env["CONTENT_TYPE"]).to eq("application/xml")
++      end
++    end
++
++    context "when the URL is https://" do
++      it "sets rack.url_scheme to https" do
++        get "https://example.org/"
++        expect(last_request.env["rack.url_scheme"]).to eq("https")
++      end
++
++      it "sets SERVER_PORT to 443" do
++        get "https://example.org/"
++        expect(last_request.env["SERVER_PORT"]).to eq("443")
++      end
++
++      it "sets HTTPS to on" do
++        get "https://example.org/"
++        expect(last_request.env["HTTPS"]).to eq("on")
++      end
++    end
++
++    context "for a XHR" do
++      it "sends XMLHttpRequest for the X-Requested-With header" do
++        request "/", :xhr => true
++        expect(last_request.env["HTTP_X_REQUESTED_WITH"]).to eq("XMLHttpRequest")
++        expect(last_request).to be_xhr
++      end
++    end
++  end
++
++  describe "#header" do
++    it "sets a header to be sent with requests" do
++      header "User-Agent", "Firefox"
++      request "/"
++
++      expect(last_request.env["HTTP_USER_AGENT"]).to eq("Firefox")
++    end
++
++    it "sets a Content-Type to be sent with requests" do
++      header "Content-Type", "application/json"
++      request "/"
++
++      expect(last_request.env["CONTENT_TYPE"]).to eq("application/json")
++    end
++
++    it "sets a Host to be sent with requests" do
++      header "Host", "www.example.ua"
++      request "/"
++
++      expect(last_request.env["HTTP_HOST"]).to eq("www.example.ua")
++    end
++
++    it "persists across multiple requests" do
++      header "User-Agent", "Firefox"
++      request "/"
++      request "/"
++
++      expect(last_request.env["HTTP_USER_AGENT"]).to eq("Firefox")
++    end
++
++    it "overwrites previously set headers" do
++      header "User-Agent", "Firefox"
++      header "User-Agent", "Safari"
++      request "/"
++
++      expect(last_request.env["HTTP_USER_AGENT"]).to eq("Safari")
++    end
++
++    it "can be used to clear a header" do
++      header "User-Agent", "Firefox"
++      header "User-Agent", nil
++      request "/"
++
++      expect(last_request.env).not_to have_key("HTTP_USER_AGENT")
++    end
++
++    it "is overridden by headers sent during the request" do
++      header "User-Agent", "Firefox"
++      request "/", "HTTP_USER_AGENT" => "Safari"
++
++      expect(last_request.env["HTTP_USER_AGENT"]).to eq("Safari")
++    end
++  end
++
++  describe "#env" do
++    it "sets the env to be sent with requests" do
++      env "rack.session", {:csrf => 'token'}
++      request "/"
++
++      expect(last_request.env["rack.session"]).to eq({:csrf => 'token'})
++    end
++
++    it "persists across multiple requests" do
++      env "rack.session", {:csrf => 'token'}
++      request "/"
++      request "/"
++
++      expect(last_request.env["rack.session"]).to eq({:csrf => 'token'})
++    end
++
++    it "overwrites previously set envs" do
++      env "rack.session", {:csrf => 'token'}
++      env "rack.session", {:some => :thing}
++      request "/"
++
++      expect(last_request.env["rack.session"]).to eq({:some => :thing})
++    end
++
++    it "can be used to clear a env" do
++      env "rack.session", {:csrf => 'token'}
++      env "rack.session", nil
++      request "/"
++
++      expect(last_request.env).not_to have_key("X_CSRF_TOKEN")
++    end
++
++    it "is overridden by envs sent during the request" do
++      env "rack.session", {:csrf => 'token'}
++      request "/", "rack.session" => {:some => :thing}
++
++      expect(last_request.env["rack.session"]).to eq({:some => :thing})
++    end
++  end
++
++  describe "#authorize" do
++    it "sets the HTTP_AUTHORIZATION header" do
++      authorize "bryan", "secret"
++      request "/"
++
++      expect(last_request.env["HTTP_AUTHORIZATION"]).to eq("Basic YnJ5YW46c2VjcmV0\n")
++    end
++
++    it "includes the header for subsequent requests" do
++      basic_authorize "bryan", "secret"
++      request "/"
++      request "/"
++
++      expect(last_request.env["HTTP_AUTHORIZATION"]).to eq("Basic YnJ5YW46c2VjcmV0\n")
++    end
++  end
++
++  describe "follow_redirect!" do
++    it "follows redirects" do
++      get "/redirect"
++      follow_redirect!
++
++      expect(last_response).not_to be_redirect
++      expect(last_response.body).to eq("You've been redirected")
++      expect(last_request.env["HTTP_REFERER"]).to eql("http://example.org/redirect")
++    end
++
++    it "does not include params when following the redirect" do
++      get "/redirect", { "foo" => "bar" }
++      follow_redirect!
++
++      expect(last_request.GET).to eq({})
++    end
++
++    it "raises an error if the last_response is not set" do
++      expect {
++        follow_redirect!
++      }.to raise_error(Rack::Test::Error)
++    end
++
++    it "raises an error if the last_response is not a redirect" do
++      get "/"
++
++      expect {
++        follow_redirect!
++      }.to raise_error(Rack::Test::Error)
++    end
++
++    context "for HTTP 307" do
++      it "keeps the original method" do
++        post "/redirect?status=307", {foo: "bar"}
++        follow_redirect!
++        last_response.body.should include "post"
++        last_response.body.should include "foo"
++        last_response.body.should include "bar"
++      end
++    end
++  end
++
++  describe "#last_request" do
++    it "returns the most recent request" do
++      request "/"
++      expect(last_request.env["PATH_INFO"]).to eq("/")
++    end
++
++    it "raises an error if no requests have been issued" do
++      expect {
++        last_request
++      }.to raise_error(Rack::Test::Error)
++    end
++  end
++
++  describe "#last_response" do
++    it "returns the most recent response" do
++      request "/"
++      expect(last_response["Content-Type"]).to eq("text/html;charset=utf-8")
++    end
++
++    it "raises an error if no requests have been issued",focus: true do
++      expect {
++        last_response
++      }.to raise_error(Rack::Test::Error)
++    end
++  end
++
++  describe "after_request" do
++    it "runs callbacks after each request" do
++      ran = false
++
++      rack_mock_session.after_request do
++        ran = true
++      end
++
++      get "/"
++      expect(ran).to eq(true)
++    end
++
++    it "runs multiple callbacks" do
++      count = 0
++
++      2.times do
++        rack_mock_session.after_request do
++          count += 1
++        end
++      end
++
++      get "/"
++      expect(count).to eq(2)
++    end
++  end
++
++  describe "#get" do
++    it_should_behave_like "any #verb methods"
++
++    def verb
++      "get"
++    end
++
++    it "uses the provided params hash" do
++      get "/", :foo => "bar"
++      expect(last_request.GET).to eq({ "foo" => "bar" })
++    end
++
++    it "sends params with parens in names" do
++      get "/", "foo(1i)" => "bar"
++      expect(last_request.GET["foo(1i)"]).to eq("bar")
++    end
++
++    it "supports params with encoding sensitive names" do
++      get "/", "foo bar" => "baz"
++      expect(last_request.GET["foo bar"]).to eq("baz")
++    end
++
++    it "supports params with nested encoding sensitive names" do
++      get "/", "boo" => {"foo bar" => "baz"}
++      expect(last_request.GET).to eq({"boo" => {"foo bar" => "baz"}})
++    end
++
++    it "accepts params in the path" do
++      get "/?foo=bar"
++      expect(last_request.GET).to eq({ "foo" => "bar" })
++    end
++  end
++
++  describe "#head" do
++    it_should_behave_like "any #verb methods"
++
++    def verb
++      "head"
++    end
++  end
++
++  describe "#post" do
++    it_should_behave_like "any #verb methods"
++
++    def verb
++      "post"
++    end
++
++    it "uses the provided params hash" do
++      post "/", :foo => "bar"
++      expect(last_request.POST).to eq({ "foo" => "bar" })
++    end
++
++    it "supports params with encoding sensitive names" do
++      post "/", "foo bar" => "baz"
++      expect(last_request.POST["foo bar"]).to eq("baz")
++    end
++
++    it "uses application/x-www-form-urlencoded as the default CONTENT_TYPE" do
++      post "/"
++      expect(last_request.env["CONTENT_TYPE"]).to eq("application/x-www-form-urlencoded")
++    end
++
++    it "accepts a body" do
++      post "/", "Lobsterlicious!"
++      expect(last_request.body.read).to eq("Lobsterlicious!")
++    end
++
++    context "when CONTENT_TYPE is specified in the env" do
++      it "does not overwrite the CONTENT_TYPE" do
++        post "/", {}, { "CONTENT_TYPE" => "application/xml" }
++        expect(last_request.env["CONTENT_TYPE"]).to eq("application/xml")
++      end
++    end
++  end
++
++  describe "#put" do
++    it_should_behave_like "any #verb methods"
++
++    def verb
++      "put"
++    end
++
++    it "accepts a body" do
++      put "/", "Lobsterlicious!"
++      expect(last_request.body.read).to eq("Lobsterlicious!")
++    end
++  end
++
++  describe "#patch" do
++    it_should_behave_like "any #verb methods"
++
++    def verb
++      "patch"
++    end
++
++    it "accepts a body" do
++      patch "/", "Lobsterlicious!"
++      expect(last_request.body.read).to eq("Lobsterlicious!")
++    end
++  end
++
++  describe "#delete" do
++    it_should_behave_like "any #verb methods"
++
++    def verb
++      "delete"
++    end
++
++     it "does not set a content type" do
++       delete "/"
++
++       expect(last_request.env['CONTENT_TYPE']).to be_nil
++     end
++  end
++
++  describe "#options" do
++    it_should_behave_like "any #verb methods"
++
++    def verb
++      "options"
++    end
++  end
++end
+diff --git a/spec/spec_helper.rb b/spec/spec_helper.rb
+new file mode 100644
+index 0000000..143528e
+--- /dev/null
++++ b/spec/spec_helper.rb
+@@ -0,0 +1,66 @@
++require "rack"
++require "rspec"
++require "rubocop"
++require "sinatra"
++require "thor"
++
++Dir[File.dirname(__FILE__) + "/support/**/*.rb"].each {|f| require f}
++
++require "rack/test"
++require File.dirname(__FILE__) + "/fixtures/fake_app"
++
++RSpec.configure do |config|
++  config.mock_with :rspec
++  config.include Rack::Test::Methods
++
++  def app
++    Rack::Lint.new(Rack::Test::FakeApp.new)
++  end
++
++  def check(*args)
++  end
++
++end
++
++shared_examples_for "any #verb methods" do
++  it "requests the URL using VERB" do
++    send(verb, "/")
++
++    check expect(last_request.env["REQUEST_METHOD"]).to eq(verb.upcase)
++    expect(last_response).to be_ok
++  end
++
++  it "uses the provided env" do
++    send(verb, "/", {}, { "HTTP_USER_AGENT" => "Rack::Test" })
++    expect(last_request.env["HTTP_USER_AGENT"]).to eq("Rack::Test")
++  end
++
++  it "yields the response to a given block" do
++    yielded = false
++
++    send(verb, "/") do |response|
++      expect(response).to be_ok
++      yielded = true
++    end
++
++    expect(yielded).to be_truthy
++  end
++
++  it "sets the HTTP_HOST header with port" do
++    send(verb, "http://example.org:8080/uri")
++    expect(last_request.env["HTTP_HOST"]).to eq("example.org:8080")
++  end
++
++  it "sets the HTTP_HOST header without port" do
++    send(verb, "/uri")
++    expect(last_request.env["HTTP_HOST"]).to eq("example.org")
++  end
++
++  context "for a XHR" do
++    it "sends XMLHttpRequest for the X-Requested-With header" do
++      send(verb, "/", {}, { :xhr => true })
++      expect(last_request.env["HTTP_X_REQUESTED_WITH"]).to eq("XMLHttpRequest")
++      expect(last_request).to be_xhr
++    end
++  end
++end
+diff --git a/spec/support/matchers/body.rb b/spec/support/matchers/body.rb
+new file mode 100644
+index 0000000..a79c1ff
+--- /dev/null
++++ b/spec/support/matchers/body.rb
+@@ -0,0 +1,9 @@
++RSpec::Matchers.define :have_body do |expected|
++  match do |response|
++    expect(response.body).to eq(expected)
++  end
++
++  description do
++    "have body #{expected.inspect}"
++  end
++end
+diff --git a/spec/support/matchers/challenge.rb b/spec/support/matchers/challenge.rb
+new file mode 100644
+index 0000000..08ab9b1
+--- /dev/null
++++ b/spec/support/matchers/challenge.rb
+@@ -0,0 +1,11 @@
++RSpec::Matchers.define :be_challenge do
++  match do |actual_response|
++    actual_response.status == 401 &&
++    actual_response['WWW-Authenticate'] =~ /^Digest / &&
++    actual_response.body.empty?
++  end
++
++  description do
++    "a HTTP Digest challenge response"
++  end
++end

@@ -1,5 +1,5 @@
 module Rack
   module Test
-    VERSION = '0.7.0'.freeze
+    VERSION = '2.1.0'.freeze
   end
 end

@@ -1,2 +1,2 @@
-0001-Import-upstream-rspec-files.patch
-0002-Drop-code-climate-reporter.patch
+0001-gemspec-spec_helper-drop-require_relative-to-lib-dir.patch
+0002-Skip-test-with-invalid-domain.patch

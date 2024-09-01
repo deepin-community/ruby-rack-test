@@ -1,1 +1,10 @@
-.pc/
+pkg
+doc
+coverage
+/Gemfile*.lock
+VERSION
+*.rbc
+*.swp
+/rack-test-*.gem
+/.bundle
+/.idea

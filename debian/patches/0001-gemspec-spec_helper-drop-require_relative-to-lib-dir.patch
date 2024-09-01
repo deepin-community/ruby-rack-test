@@ -1,0 +1,38 @@
+From: Antonio Terceiro <terceiro@debian.org>
+Date: Sat, 20 Aug 2022 17:58:57 -0300
+Subject: gemspec, spec_helper: drop require_relative to lib/ directory
+
+This allows the test suite to run against the installed package. I tried
+to submit this upstream but was rejected.
+
+Link: https://github.com/rack/rack-test/pull/319
+Forwarded: not-needed
+---
+ rack-test.gemspec   | 3 ++-
+ spec/spec_helper.rb | 2 +-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/rack-test.gemspec b/rack-test.gemspec
+index 649caf3..8c1139b 100644
+--- a/rack-test.gemspec
++++ b/rack-test.gemspec
+@@ -1,4 +1,5 @@
+-require_relative 'lib/rack/test/version'
++$:.unshift(File.expand_path("lib", File.dirname(__FILE__)))
++require 'rack/test/version'
+ 
+ Gem::Specification.new do |s|
+   s.name = 'rack-test'
+diff --git a/spec/spec_helper.rb b/spec/spec_helper.rb
+index 8c527c7..ac231da 100644
+--- a/spec/spec_helper.rb
++++ b/spec/spec_helper.rb
+@@ -12,7 +12,7 @@ ENV['MT_NO_PLUGINS'] = '1' # Work around stupid autoloading of plugins
+ gem 'minitest'
+ require 'minitest/global_expectations/autorun'
+ 
+-require_relative '../lib/rack/test'
++require 'rack/test'
+ require_relative 'fixtures/fake_app'
+ 
+ class Minitest::Spec

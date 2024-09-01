@@ -1,9 +1,76 @@
-ruby-rack-test (0.7.0-1.1) unstable; urgency=medium
+ruby-rack-test (2.1.0-1) unstable; urgency=medium
 
-  * Non maintainer upload by the Reproducible Builds team.
-  * No source change upload to rebuild on buildd with .buildinfo files.
+  * Team upload.
+  * New upstream release.
+  * Refresh patch.
+  * Declare compliance with Debian Policy 4.7.0.
+  * Add patch to skip test with invalid domain.
 
- -- Holger Levsen <holger@debian.org>  Mon, 28 Dec 2020 15:08:37 +0100
+ -- Lucas Kanashiro <kanashiro@debian.org>  Wed, 17 Jul 2024 23:55:57 -0300
+
+ruby-rack-test (2.0.2-2) unstable; urgency=medium
+
+  * Team upload
+  * Drop spurious build dependency on rubocop
+
+ -- Antonio Terceiro <terceiro@debian.org>  Thu, 15 Dec 2022 11:11:43 -0300
+
+ruby-rack-test (2.0.2-1) unstable; urgency=medium
+
+  * Team upload
+  * debian/watch: point at github to get tests
+  * New upstream version 2.0.2
+    - Upstream changed the test suite from rspec to minitest, so the reported
+      build failure no longer applies (Closes: #1005427)
+  * debian/upstream/metadata: update with dh-make-ruby
+  * debian/rules: stop setting DH_RUBY_GEMSPEC, no longer needed
+  * debian/control: update with dh-make-ruby
+    - Bump Standards-Version to 4.6.1; no changes needed
+    - Drop alternative build dependency on ruby-rack1.4 (it no longer exists)
+    - Update homepage to point to the new upstream homepage
+    - Add Testsuite: autopkgtest-pkg-ruby
+    - Add Rules-Requires-Root: no
+    - Replace hardcoded dependencies with ${ruby:Depends
+    - Update binary package description from upstream metadata
+  * Add build dependency on ruby-minitest-global-expectations
+  * debian/ruby-tests.rake: symlink to upstream Rakefile.
+    Upstream switched from rspec to minitest, so using rspec no longer
+    works.
+  * Drop patches, no longer needed in new upstream release
+  * Add patch to make test suite work against installed package
+
+ -- Antonio Terceiro <terceiro@debian.org>  Sun, 21 Aug 2022 11:12:15 -0300
+
+ruby-rack-test (0.7.0-2) unstable; urgency=medium
+
+  * Team Upload
+
+  [ Utkarsh Gupta ]
+  * Add salsa-ci.yml
+
+  [ Debian Janitor ]
+  * Use secure copyright file specification URI.
+  * Wrap long lines in changelog entries: 0.6.2-2.
+  * Use secure URI in debian/watch.
+  * Use secure URI in Homepage field.
+  * Bump debhelper from old 10 to 12.
+  * Set debhelper-compat version in Build-Depends.
+  * Update Vcs-* headers from URL redirect.
+  * Use canonical URL in Vcs-Git.
+  * Update standards version to 4.1.1, no changes needed.
+  * Set upstream metadata fields: Bug-Database, Bug-Submit, Repository,
+    Repository-Browse.
+  * Remove constraints unnecessary since buster:
+    + Build-Depends: Drop versioned constraint on ruby-rack.
+    + ruby-rack-test: Drop versioned constraint on ruby-rack in Depends.
+  * Update watch file format version to 4.
+  * Bump debhelper from old 12 to 13.
+
+  [ Pirate Praveen ]
+  * Bump Standards-Version to 4.6.0 (no changes needed)
+  * Switch to gem-install layout for bundle --local compatibility
+
+ -- Pirate Praveen <praveen@debian.org>  Mon, 24 Jan 2022 01:15:24 +0530
 
 ruby-rack-test (0.7.0-1) unstable; urgency=medium
 
@@ -50,7 +117,8 @@ ruby-rack-test (0.6.2-2) unstable; urgency=low
   [ Cédric Boutillier ]
   * debian/control: remove obsolete DM-Upload-Allowed flag
   * use canonical URI in Vcs-* fields
-  * debian/copyright: use DEP5 copyright-format/1.0 official URL for Format field
+  * debian/copyright: use DEP5 copyright-format/1.0 official URL for Format
+    field
 
   [ Christian Hofstaedtler ]
   * Add alternative dependency on ruby-rack1.4

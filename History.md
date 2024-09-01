@@ -1,3 +1,187 @@
+## 2.1.0 / 2023-03-14
+
+* Breaking changes:
+  * Digest authentication support, deprecated in 2.0.0, has been
+    removed (Jeremy Evans #307)
+  * requiring rack/mock_session, deprecated in 2.0.0, has been removed
+    (Jeremy Evans #307)
+
+* Minor enhancements:
+  * The `original_filename` for `Rack::Test::UploadedFile` can now be
+    set even if the content of the file comes from a file path
+    (Stuart Chinery #314)
+  * Add `Rack::Test::Session#restore_state`, for executing a block
+    and restoring current state (last request, last response, and
+    cookies) after the block (Jeremy Evans #316)
+  * Make `Rack::Test::Methods` support `default_host` method similar to
+    `app`, which will set the default host used for requests to the app
+    (Jeremy Evans #317 #318)
+  * Allow responses to set cookie paths not matching the current
+    request URI. Such cookies will only be sent for paths matching
+    the cookie path (Chris Waters #322)
+  * Ignore leading dot for cookie domains, per RFC 6265 (Stephen Crosby
+    #329)
+  * Avoid creating empty multipart body if params is empty in
+    `Rack::Test::Session#env_for` (Ryunosuke Sato #331)
+
+## 2.0.2 / 2022-06-28
+
+* Bug fixes:
+  * Fix additional incompatible character encodings error when building
+    uploaded bodies (Jeremy Evans #311)
+
+## 2.0.1 / 2022-06-27
+
+* Bug fixes:
+  * Fix incompatible character encodings error when building uploaded
+    file bodies (Jeremy Evans #308 #309)
+
+## 2.0.0 / 2022-06-24
+
+* Breaking changes:
+  * Digest authentication support is now deprecated, as it relies on
+    digest authentication support in rack, which has been deprecated
+    (Jeremy Evans #294)
+  * `Rack::Test::Utils.build_primitive_part` no longer handles array
+    values (Jeremy Evans #292)
+  * `Rack::Test::Utils` module methods other than `build_nested_query`
+    and `build_multipart` are now private methods (Jeremy Evans #297)
+  * `Rack::MockSession` has been combined into `Rack::Test::Session`,
+    and remains as an alias to `Rack::Test::Session`, but to keep some
+    backwards compatibility, `Rack::Test::Session.new` will accept a
+    `Rack::Test::Session` instance and return it (Jeremy Evans #297)
+  * Previously protected methods in `Rack::Test::Cookie{,Jar}` are now
+    private methods (Jeremy Evans #297)
+  * `Rack::Test::Methods` no longer defines `build_rack_mock_session`,
+    but for backwards compatibility, `build_rack_test_session` will call
+    `build_rack_mock_session` if it is defined (Jeremy Evans #297)
+  * `Rack::Test::Methods::METHODS` is no longer defined
+    (Jeremy Evans #297)
+  * `Rack::Test::Methods#_current_session_names` has been removed
+    (Jeremy Evans #297)
+  * Headers used/accessed by rack-test are now lower case, for rack 3
+    compliance (Jeremy Evans #295)
+  * Frozen literal strings are now used internally, which may break
+    code that mutates static strings returned by rack-test, if any
+    (Jeremy Evans #304)
+
+* Minor enhancements:
+  * rack-test now works with the rack main branch (what will be rack 3)
+    (Jeremy Evans #280 #292)
+  * rack-test only loads the parts of rack it uses when running on the
+    rack main branch (what will be rack 3) (Jeremy Evans #292)
+  * Development dependencies have been significantly reduced, and are
+    now a subset of the development dependencies of rack itself
+    (Jeremy Evans #292)
+  * Avoid creating multiple large copies of uploaded file data in
+    memory (Jeremy Evans #286)
+  * Specify HTTP/1.0 when submitting requests, to avoid responses with
+    Transfer-Encoding: chunked (Jeremy Evans #288)
+  * Support `:query_params` in rack environment for parameters that
+    are appended to the query string instead of used in the request
+    body (Jeremy Evans #150 #287)
+  * Reduce required ruby version to 2.0, since tests run fine on
+    Ruby 2.0 (Jeremy Evans #292)
+  * Support :multipart env key for request methods to force multipart
+    input (Jeremy Evans #303)
+  * Force multipart input for request methods if content type starts
+    with multipart (Jeremy Evans #303)
+  * Improve performance of Utils.build_multipart by using an
+    append-only design (Jeremy Evans #304)
+  * Improve performance of Utils.build_nested_query for array values
+    (Jeremy Evans #304)
+
+* Bug fixes:
+  * The `CONTENT_TYPE` of multipart requests is now respected, if it
+    starts with `multipart/` (Tom Knig #238)
+  * Work correctly with responses that respond to `to_a` but not
+    `to_ary` (Sergio Faria #276)
+  * Raise an ArgumentError instead of a TypeError when providing a
+    StringIO without an original filename when creating an
+    UploadedFile (Nuno Correia #279)
+  * Allow combining both an UploadedFile and a plain string when
+    building a multipart upload (Mitsuhiro Shibuya #278)
+  * Fix the generation of filenames with spaces to use path
+    escaping instead of regular escaping, since path unescaping is
+    used to decode it (Muir Manders, Jeremy Evans #275 #284)
+  * Rewind tempfile used for multipart uploads before it is
+    submitted to the application
+    (Jeremy Evans, Alexander Dervish #261 #268 #286)
+  * Fix Rack::Test.encoding_aware_strings to be true only on rack
+    1.6+ (Jeremy Evans #292)
+  * Make Rack::Test::CookieJar#valid? return true/false
+    (Jeremy Evans #292)
+  * Cookies without a domain attribute no longer are submitted to
+    requests for subdomains of that domain, for RFC 6265
+    compliance (Jeremy Evans #292)
+  * Increase required rack version to 1.3, since tests fail on
+    rack 1.2 and below (Jeremy Evans #293)
+
+## 1.1.0 / 2018-07-21
+
+* Breaking changes:
+  * None
+
+* Minor enhancements / new functionality:
+  * [GitHub] Added configuration for Stale (Per Lundberg #232)
+  * follow_direct: Include rack.session.options (Mark Edmondson #233)
+  * [CI] Add simplecov (fatkodima #227)
+
+* Bug fixes:
+  * Follow relative locations correctly. (Samuel Williams #230)
+
+## 1.0.0 / 2018-03-27
+
+* Breaking changes:
+  * Always set CONTENT_TYPE for non-GET requests
+    (Per Lundberg #223)
+
+* Minor enhancements / bug fixes:
+  * Create tempfile using the basename without extension
+    (Edouard Chin #201)
+  * Save `session` during `follow_redirect!`
+    (Alexander Popov #218)
+  * Document how to use URL params with DELETE method
+    (Timur Platonov #220)
+
+## 0.8.3 / 2018-02-27
+
+* Bug fixes:
+  * Do not set Content-Type if params are explicitly set to nil
+    (Bartek Bułat #212). Fixes #200.
+  * Fix `UploadedFile#new` regression
+    (Per Lundberg #215)
+
+* Minor enhancements
+  * [CI] Test against Ruby 2.5 (Nicolas Leger #217)
+
+## 0.8.2 / 2017-11-21
+
+* Bug fixes:
+  * Bugfix for `UploadedFile.new` unintended API breakage.
+    (Per Lundberg #210)
+
+## 0.8.0 / 2017-11-20
+
+* Known Issue
+  * In `UploadedFile.new`, when passing e.g. a `Pathname` object,
+    errors can be raised (eg. `ArgumentError: Missing original_filename
+    for IO`, or `NoMethodError: undefined method 'size'`) See #207, #209.
+* Minor enhancements
+  * Add a required_ruby_version of >= 2.2.2, similar to rack 2.0.1.
+    (Samuel Giddins #194)
+  * Remove new line from basic auth. (Felix Kleinschmidt #185)
+  * Rubocop fixes (Per Lundberg #196)
+  * Add how to install rack-test from github to README. (Jun Aruga #189)
+  * Update CodeClimate badges (Toshimaru #195)
+  * Add the ability to create Test::UploadedFile instances without
+    the file system (Adam Milligan #149)
+  * Add custom_request, remove duplication (Johannes Barre #184)
+  * README.md: Added note about how to post JSON (Per Lundberg #198)
+  * README.md: Added version badge (Per Lundberg #199)
+* Bug fixes
+  * Bugfix for Cookies with multiple paths (Kyle Welsby #197)
+
 ## 0.7.0 / 2017-07-10
 
 * Major enhancements
